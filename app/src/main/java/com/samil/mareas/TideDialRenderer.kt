@@ -12,7 +12,8 @@ object TideDialRenderer {
     fun render(size: Int, state: TideState): Bitmap {
         val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
-        canvas.drawColor(Color.WHITE)
+        // Fondo gris muy claro y semitransparente (mas claro que el aro gris y un poco traslucido)
+        canvas.drawColor(0xE0F2F2F2.toInt())
 
         val cx = size / 2f
         val cy = size / 2f
@@ -141,9 +142,10 @@ object TideDialRenderer {
             textSize = size * 0.058f
             textAlign = Paint.Align.CENTER
         }
-        val sidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            textSize = size * 0.052f
+        val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = size * 0.11f
             textAlign = Paint.Align.CENTER
+            isFakeBoldText = true
         }
 
         val blue = Color.parseColor("#3D7FD6")
@@ -153,20 +155,18 @@ object TideDialRenderer {
         val lowLabel = state.nextLowTide?.dateTime?.format(timeFmt) ?: "--:--"
 
         titlePaint.color = blue
-        canvas.drawText("pleamar", cx, size * 0.095f, titlePaint)
+        canvas.drawText("pleamar", cx, size * 0.055f, titlePaint)
         timePaint.color = blue
-        canvas.drawText("${highLabel}h", cx, size * 0.155f, timePaint)
+        canvas.drawText("${highLabel}h", cx, size * 0.115f, timePaint)
 
         titlePaint.color = red
         canvas.drawText("bajamar", cx, size * 0.900f, titlePaint)
         timePaint.color = red
         canvas.drawText("${lowLabel}h", cx, size * 0.960f, timePaint)
 
-        sidePaint.color = blue
-        sidePaint.textAlign = Paint.Align.LEFT
-        canvas.drawText("subiendo", size * 0.02f, cy + size * 0.02f, sidePaint)
-        sidePaint.color = red
-        sidePaint.textAlign = Paint.Align.RIGHT
-        canvas.drawText("bajando", size * 0.98f, cy + size * 0.02f, sidePaint)
+        arrowPaint.color = blue
+        canvas.drawText("↑", size * 0.10f, cy + size * 0.04f, arrowPaint)
+        arrowPaint.color = red
+        canvas.drawText("↓", size * 0.90f, cy + size * 0.04f, arrowPaint)
     }
 }
