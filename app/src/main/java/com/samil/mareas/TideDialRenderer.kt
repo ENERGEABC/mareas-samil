@@ -12,8 +12,14 @@ object TideDialRenderer {
     fun render(size: Int, state: TideState): Bitmap {
         val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
-        // Fondo gris muy claro y semitransparente (mas claro que el aro gris y un poco traslucido)
-        canvas.drawColor(0xE0F2F2F2.toInt())
+
+        // Tarjeta de fondo: gris muy claro, bastante transparente, esquinas muy redondeadas.
+        val cornerRadius = size * 0.24f
+        val cardRect = RectF(0f, 0f, size.toFloat(), size.toFloat())
+        val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0x80F2F2F2.toInt()
+        }
+        canvas.drawRoundRect(cardRect, cornerRadius, cornerRadius, cardPaint)
 
         val cx = size / 2f
         val cy = size / 2f
@@ -143,7 +149,7 @@ object TideDialRenderer {
             textAlign = Paint.Align.CENTER
         }
         val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            textSize = size * 0.11f
+            textSize = size * 0.22f
             textAlign = Paint.Align.CENTER
             isFakeBoldText = true
         }
@@ -151,8 +157,13 @@ object TideDialRenderer {
         val blue = Color.parseColor("#3D7FD6")
         val red = Color.parseColor("#D6303D")
 
-        val highLabel = state.nextHighTide?.dateTime?.format(timeFmt) ?: "--:--"
-        val lowLabel = state.nextLowTide?.dateTime?.format(timeFmt) ?: "--:--"
+        // previousEvent = la marea que ya paso (se mantiene mientras no le toque turno).
+        // nextEvent = la marea hacia la que va la aguja ahora (la activa).
+        val highEvent = if (state.rising) state.nextEvent else state.previousEvent
+        val lowEvent = if (state.rising) state.previousEvent else state.nextEvent
+
+        val highLabel = highEvent.dateTime.format(timeFmt)
+        val lowLabel = lowEvent.dateTime.format(timeFmt)
 
         titlePaint.color = blue
         canvas.drawText("pleamar", cx, size * 0.055f, titlePaint)
@@ -165,8 +176,8 @@ object TideDialRenderer {
         canvas.drawText("${lowLabel}h", cx, size * 0.960f, timePaint)
 
         arrowPaint.color = blue
-        canvas.drawText("↑", size * 0.10f, cy + size * 0.04f, arrowPaint)
+        canvas.drawText("↑", size * 0.13f, cy + size * 0.07f, arrowPaint)
         arrowPaint.color = red
-        canvas.drawText("↓", size * 0.90f, cy + size * 0.04f, arrowPaint)
+        canvas.drawText("↓", size * 0.87f, cy + size * 0.07f, arrowPaint)
     }
 }
