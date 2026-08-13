@@ -14,6 +14,7 @@ private const val BASE_URL = "https://servizos.meteogalicia.gal/mgrss/predicion/
 private const val PREFS_NAME = "tide_cache"
 private const val KEY_EVENTS_JSON = "events_json"
 private const val KEY_FETCHED_AT = "fetched_at"
+private const val ASSET_FILE = "mareas_vigo.json"
 
 class TideRepository(private val context: Context) {
 
@@ -49,10 +50,9 @@ class TideRepository(private val context: Context) {
             val body = connection.inputStream.bufferedReader().use { it.readText() }
             connection.disconnect()
 
-            val events = parseEvents(body)
+            val events = parseNetworkJson(body)
             if (events.isEmpty()) {
-                lastErrorMessage = "Respuesta sin mareas. Primeros 200 caracteres: " +
-                    body.take(200)
+                lastErrorMessage = "Respuesta sin mareas. Primeros 200 caracteres: " + body.take(200)
                 return false
             }
 
@@ -67,10 +67,37 @@ class TideRepository(private val context: Context) {
         }
     }
 
+    /**
+     * Combina los datos precargados en la app (assets/mareas_vigo.json, validos
+     * durante mas de un ano) con los datos frescos descargados por red si los
+     * hay. Esto permite que la app funcione siempre, incluso sin conexion a
+     * internet nunca.
+     */
     fun loadCachedEvents(): List<TideEvent> {
-        val cached = prefs.getString(KEY_EVENTS_JSON, null) ?: return emptyList()
+        val bundled = loadBundledEvents()
+        val network = try {
+            prefs.getString(KEY_EVENTS_JSON, null)?.let { parseNetworkJson(it) } ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+        return (bundled + network)
+            .distinctBy { it.dateTime }
+            .sortedBy { it.dateTime }
+    }
+
+    private fun loadBundledEvents(): List<TideEvent> {
         return try {
-            parseEvents(cached)
+            context.assets.open(ASSET_FILE).bufferedReader().use { reader ->
+                val arr = JSONArray(reader.readText())
+                val list = mutableListOf<TideEvent>()
+                for (i in 0 until arr.length()) {
+                    val pair = arr.getJSONArray(i)
+                    val dt = LocalDateTime.parse(pair.getString(0))
+                    val isHigh = pair.getInt(1) == 1
+                    list.add(TideEvent(dt, 0.0, isHighTide = isHigh))
+                }
+                list
+            }
         } catch (e: Exception) {
             emptyList()
         }
@@ -84,11 +111,11 @@ class TideRepository(private val context: Context) {
     }
 
     /**
-     * Cada evento trae "data" (solo el dia, siempre a las 00:00:00) y "hora"
-     * (la hora real, formato HH:mm) por separado. Hay que combinar ambos
-     * campos para obtener la fecha-hora real del evento.
+     * Cada evento de la API de MeteoGalicia trae "data" (solo el dia, siempre
+     * a las 00:00:00) y "hora" (la hora real, formato HH:mm) por separado.
+     * Hay que combinar ambos campos para obtener la fecha-hora real.
      */
-    private fun parseEvents(rawJson: String): List<TideEvent> {
+    private fun parseNetworkJson(rawJson: String): List<TideEvent> {
         val trimmed = rawJson.trim()
 
         val days: JSONArray = when {
