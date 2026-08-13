@@ -67,12 +67,6 @@ class TideRepository(private val context: Context) {
         }
     }
 
-    /**
-     * Combina los datos precargados en la app (assets/mareas_vigo.json, validos
-     * durante mas de un ano) con los datos frescos descargados por red si los
-     * hay. Esto permite que la app funcione siempre, incluso sin conexion a
-     * internet nunca.
-     */
     fun loadCachedEvents(): List<TideEvent> {
         val bundled = loadBundledEvents()
         val network = try {
@@ -110,11 +104,6 @@ class TideRepository(private val context: Context) {
         return ageHours >= maxAgeHours
     }
 
-    /**
-     * Cada evento de la API de MeteoGalicia trae "data" (solo el dia, siempre
-     * a las 00:00:00) y "hora" (la hora real, formato HH:mm) por separado.
-     * Hay que combinar ambos campos para obtener la fecha-hora real.
-     */
     private fun parseNetworkJson(rawJson: String): List<TideEvent> {
         val trimmed = rawJson.trim()
 
@@ -147,6 +136,14 @@ class TideRepository(private val context: Context) {
         return result.sortedBy { it.dateTime }
     }
 
+    /**
+     * previousEvent = la marea que acabamos de dejar atras (pasada).
+     * nextEvent = la marea hacia la que se dirige la aguja ahora mismo.
+     * Estos dos son los que se muestran en pantalla: la etiqueta del tipo
+     * que "toca" ahora (segun state.rising) usa nextEvent, y la etiqueta
+     * del otro tipo se mantiene con previousEvent hasta que la aguja
+     * sobrepase su propio extremo y le toque el turno de nuevo.
+     */
     fun computeState(events: List<TideEvent>, now: LocalDateTime = LocalDateTime.now()): TideState? {
         if (events.size < 2) return null
 
@@ -173,16 +170,11 @@ class TideRepository(private val context: Context) {
 
         val rising = prev.isHighTide.not()
 
-        val nextHigh = events.firstOrNull { it.dateTime.isAfter(now) && it.isHighTide }
-        val nextLow = events.firstOrNull { it.dateTime.isAfter(now) && !it.isHighTide }
-
         return TideState(
             previousEvent = prev,
             nextEvent = next,
             progressFraction = fraction,
-            rising = rising,
-            nextHighTide = nextHigh,
-            nextLowTide = nextLow
+            rising = rising
         )
     }
 }
