@@ -7,8 +7,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.ZoneId
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 private const val ID_PORTO_VIGO = 3
@@ -22,16 +20,20 @@ class TideRepository(private val context: Context) {
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val dateFmt = DateTimeFormatter.ofPattern("dd/MM/yyyy")
-    private val madridZone = ZoneId.of("Europe/Madrid")
 
     var lastErrorMessage: String? = null
         private set
 
-    private fun toLocalTime(isoNaiveUtc: String): LocalDateTime {
-        val utcDateTime = LocalDateTime.parse(isoNaiveUtc)
-        return utcDateTime.atZone(ZoneOffset.UTC)
-            .withZoneSameInstant(madridZone)
-            .toLocalDateTime()
+    /**
+     * CONFIRMADO el 26/08/2026 comparando contra la fuente oficial del
+     * Instituto Hidrografico de la Marina (IHM) para Marin: MeteoGalicia
+     * devuelve la hora de la marea siempre 2 horas por delante de la hora
+     * real de Espana. No es un tema de UTC, es un desfase fijo de la propia
+     * fuente (afecta igual a todos los puertos de MeteoGalicia, incluido
+     * Vigo). Por eso restamos 2 horas aqui, siempre.
+     */
+    private fun toLocalTime(isoNaive: String): LocalDateTime {
+        return LocalDateTime.parse(isoNaive).minusHours(2)
     }
 
     fun syncFromNetwork(): Boolean {
@@ -92,8 +94,7 @@ class TideRepository(private val context: Context) {
     private fun loadBundledEvents(): List<TideEvent> {
         return try {
             context.assets.open(ASSET_FILE).bufferedReader().use { reader ->
-                val text = reader.readText()
-                val arr = JSONArray(text)
+                val arr = JSONArray(reader.readText())
                 val list = mutableListOf<TideEvent>()
                 for (i in 0 until arr.length()) {
                     val entry = arr.getJSONArray(i)
