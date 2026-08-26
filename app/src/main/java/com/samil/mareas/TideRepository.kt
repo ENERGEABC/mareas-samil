@@ -7,6 +7,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 private const val ID_PORTO_VIGO = 3
@@ -20,9 +22,17 @@ class TideRepository(private val context: Context) {
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val dateFmt = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+    private val madridZone = ZoneId.of("Europe/Madrid")
 
     var lastErrorMessage: String? = null
         private set
+
+    private fun toLocalTime(isoNaiveUtc: String): LocalDateTime {
+        val utcDateTime = LocalDateTime.parse(isoNaiveUtc)
+        return utcDateTime.atZone(ZoneOffset.UTC)
+            .withZoneSameInstant(madridZone)
+            .toLocalDateTime()
+    }
 
     fun syncFromNetwork(): Boolean {
         lastErrorMessage = null
@@ -82,13 +92,15 @@ class TideRepository(private val context: Context) {
     private fun loadBundledEvents(): List<TideEvent> {
         return try {
             context.assets.open(ASSET_FILE).bufferedReader().use { reader ->
-                val arr = JSONArray(reader.readText())
+                val text = reader.readText()
+                val arr = JSONArray(text)
                 val list = mutableListOf<TideEvent>()
                 for (i in 0 until arr.length()) {
-                    val pair = arr.getJSONArray(i)
-                    val dt = LocalDateTime.parse(pair.getString(0))
-                    val isHigh = pair.getInt(1) == 1
-                    list.add(TideEvent(dt, 0.0, isHighTide = isHigh))
+                    val entry = arr.getJSONArray(i)
+                    val dt = toLocalTime(entry.getString(0))
+                    val isHigh = entry.getInt(1) == 1
+                    val altura = if (entry.length() > 2) entry.getDouble(2) else 0.0
+                    list.add(TideEvent(dt, altura, isHighTide = isHigh))
                 }
                 list
             }
@@ -127,7 +139,7 @@ class TideRepository(private val context: Context) {
                 val e = lista.getJSONObject(j)
                 val datePart = e.getString("data").substring(0, 10)
                 val horaPart = e.optString("hora", "00:00")
-                val dt = LocalDateTime.parse("${datePart}T${horaPart}:00")
+                val dt = toLocalTime("${datePart}T${horaPart}:00")
                 val altura = e.optDouble("altura", 0.0)
                 val idTipo = e.optInt("idTipoMarea", 0)
                 result.add(TideEvent(dt, altura, isHighTide = idTipo == 1))
@@ -136,14 +148,6 @@ class TideRepository(private val context: Context) {
         return result.sortedBy { it.dateTime }
     }
 
-    /**
-     * previousEvent = la marea que acabamos de dejar atras (pasada).
-     * nextEvent = la marea hacia la que se dirige la aguja ahora mismo.
-     * Estos dos son los que se muestran en pantalla: la etiqueta del tipo
-     * que "toca" ahora (segun state.rising) usa nextEvent, y la etiqueta
-     * del otro tipo se mantiene con previousEvent hasta que la aguja
-     * sobrepase su propio extremo y le toque el turno de nuevo.
-     */
     fun computeState(events: List<TideEvent>, now: LocalDateTime = LocalDateTime.now()): TideState? {
         if (events.size < 2) return null
 
