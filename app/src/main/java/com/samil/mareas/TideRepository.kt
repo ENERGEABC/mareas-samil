@@ -25,15 +25,18 @@ class TideRepository(private val context: Context) {
         private set
 
     /**
-     * CONFIRMADO el 26/08/2026 comparando contra la fuente oficial del
-     * Instituto Hidrografico de la Marina (IHM) para Marin: MeteoGalicia
-     * devuelve la hora de la marea siempre 2 horas por delante de la hora
-     * real de Espana. No es un tema de UTC, es un desfase fijo de la propia
-     * fuente (afecta igual a todos los puertos de MeteoGalicia, incluido
-     * Vigo). Por eso restamos 2 horas aqui, siempre.
+     * CONFIRMADO el 26/08/2026 con documentacion oficial (paginas del IHM y
+     * de Portos de Galicia): el IHM publica sus mareas en UTC (hay que
+     * sumar el adelanto de horario vigente para tener la hora oficial). El
+     * dato "hora" que devuelve MeteoGalicia YA viene en hora local de
+     * Espana (coincide exactamente con IHM+2h en verano), asi que no hay
+     * que sumar ni restar nada aqui. Se dejaron restados -2h en una
+     * correccion anterior por error: NO volver a tocar esto sin verificar
+     * antes contra una fuente que ya declare explicitamente su zona
+     * horaria (esta funcion queda como paso directo, documentado).
      */
     private fun toLocalTime(isoNaive: String): LocalDateTime {
-        return LocalDateTime.parse(isoNaive).minusHours(2)
+        return LocalDateTime.parse(isoNaive)
     }
 
     fun syncFromNetwork(): Boolean {
